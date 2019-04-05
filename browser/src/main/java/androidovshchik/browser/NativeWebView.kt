@@ -19,6 +19,8 @@ class NativeWebView : FrameLayout, CoroutineScope {
 
     private var currentUrl: String? = null
 
+    private var webViewClient: NativeBrowserClient? = null
+
     constructor(context: Context) : this(context, null)
 
     constructor(context: Context, attrs: AttributeSet?) : this(context, attrs, 0)
@@ -41,7 +43,14 @@ class NativeWebView : FrameLayout, CoroutineScope {
 
     }
 
+    fun setWebViewClient(init: NativeBrowserClient.() -> Unit) {
+        val client = NativeBrowserClient()
+        client.init()
+        webViewClient = client
+    }
+
     fun loadUrl(url: String) {
+        stopLoading()
         currentUrl = url
         launch {
             withContext(Dispatchers.IO) {
@@ -66,11 +75,11 @@ class NativeWebView : FrameLayout, CoroutineScope {
     }
 
     fun reload() {
-        stop()
+        stopLoading()
         loadUrl(currentUrl ?: return)
     }
 
-    fun stop() {
+    fun stopLoading() {
         coroutineContext.cancelChildren()
         val dispatcher = httpClient.dispatcher()
         for (call in dispatcher.runningCalls()) {
@@ -85,7 +94,13 @@ class NativeWebView : FrameLayout, CoroutineScope {
         }
     }
 
-    fun release() {
+    fun canGoBack(): Boolean {
+        return false
+    }
+
+    fun goBack() {}
+
+    fun destroy() {
         coroutineContext.cancelChildren()
         val dispatcher = httpClient.dispatcher()
         for (call in dispatcher.runningCalls()) {

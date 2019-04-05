@@ -12,6 +12,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
+        webView.setWebViewClient {
+            shouldOverrideUrlLoading {
+                input.setText(it)
+                return@shouldOverrideUrlLoading true
+            }
+        }
+        webView.loadUrl("https://google.ru")
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -22,10 +29,12 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.action_back -> {
-
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                }
             }
             R.id.action_reload -> {
-
+                webView.reload()
             }
             R.id.action_google -> {
                 webView.loadUrl("https://google.ru")
@@ -35,5 +44,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return true
+    }
+
+    override fun onDestroy() {
+        webView.destroy()
+        super.onDestroy()
     }
 }
