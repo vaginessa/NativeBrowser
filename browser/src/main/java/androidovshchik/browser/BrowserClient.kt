@@ -12,7 +12,7 @@ private typealias OnPageFinished = (url: String) -> Unit
 
 private typealias OnReceivedError = (url: String, code: Int, description: String) -> Unit
 
-class NativeBrowserClient {
+class BrowserClient {
 
     private var overrideUrlLoading: ShouldOverrideUrlLoading? = null
 

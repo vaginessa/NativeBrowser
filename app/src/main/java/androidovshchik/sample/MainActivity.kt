@@ -18,7 +18,7 @@ class MainActivity : AppCompatActivity() {
                 return@shouldOverrideUrlLoading true
             }
         }
-        webView.loadUrl("https://google.ru")
+        webView.loadUrl("https://yandex.ru")
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -28,11 +28,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.action_back -> {
-                if (webView.canGoBack()) {
-                    webView.goBack()
-                }
-            }
             R.id.action_reload -> {
                 webView.reload()
             }
