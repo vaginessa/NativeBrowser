@@ -6,13 +6,12 @@ import android.annotation.TargetApi
 import android.content.Context
 import android.os.Build
 import android.util.AttributeSet
+import android.view.View
 import android.widget.FrameLayout
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.*
 import okhttp3.*
 import org.jsoup.Jsoup
+import org.jsoup.parser.Tag
 import timber.log.Timber
 import java.io.IOException
 
@@ -27,6 +26,10 @@ class NativeWebView : FrameLayout, Callback, CoroutineScope {
     private var webViewClient: BrowserClient? = null
 
     private var currentUrl: String? = null
+
+    private var documentStyle = ""
+
+    private var documentScript = ""
 
     constructor(context: Context) : this(context, null)
 
@@ -51,9 +54,17 @@ class NativeWebView : FrameLayout, Callback, CoroutineScope {
     fun loadUrl(url: String) {
         stopLoading()
         currentUrl = url
+        makeRequest(url, url)
+    }
+
+    private fun makeRequest(url: String, tag: Any?) {
+        val formattedUrl = when {
+            url.trim().startsWith("//") -> "http://$url"
+            else -> url.trim()
+        }
         val request = Request.Builder()
-            .url(url)
-            .tag(url)
+            .url(formattedUrl)
+            .tag(tag)
             .build()
         httpClient.newCall(request)
             .enqueue(this)
@@ -67,65 +78,77 @@ class NativeWebView : FrameLayout, Callback, CoroutineScope {
             //webViewClient?.onReceivedError(url, response.code(), response.message())
             return
         }
-        val tag = call.request().tag()
+        val tag = call.request()
+            .tag()
         val body = response.body()
-        when (body?.contentType()?.type()) {
-            "text" -> {
-                when (body.contentType()?.subtype()) {
-                    "html" -> {
-                        //if () {
-
-                        //}
-                        Jsoup.parse(body.string() ?: "").apply {
-                            //normalise()
-                            select("link")
-                                .forEach {
-                                    Timber.d("link: " + it.attributes().asList())
-                                    if (!it.attributes().hasKeyIgnoreCase("href")) {
-                                        return@forEach
-                                    }
-                                    Timber.d("href: " + it.attributes().getIgnoreCase("href"))
-                                    val request = Request.Builder()
-                                        .url(it.attributes().getIgnoreCase("href"))
-                                        .tag(tag)
-                                        .build()
-                                    httpClient.newCall(request)
-                                        .enqueue(this@NativeWebView)
+        launch {
+            withContext(Dispatchers.IO) {
+                when (body?.contentType()?.type()) {
+                    "text" -> {
+                        when (body.contentType()?.subtype()) {
+                            "html" -> {
+                                if (childCount >= 1) {
+                                    return@withContext
                                 }
-                            select("script")
-                                .forEach {
-                                    Timber.d("script: " + it.attributes().asList())
-                                    if (!it.attributes().hasKeyIgnoreCase("src")) {
-                                        return@forEach
-                                    }
-                                    Timber.d("src: " + it.attributes().getIgnoreCase("src"))
-                                    val request = Request.Builder()
-                                        .url(it.attributes().getIgnoreCase("src"))
-                                        .tag(tag)
-                                        .build()
-                                    httpClient.newCall(request)
-                                        .enqueue(this@NativeWebView)
+                                val html = ElementViewGroup(context.applicationContext).apply {
+                                    id = R.id.page_content
+                                    layoutParams = FrameLayout.LayoutParams(
+                                        FrameLayout.LayoutParams.MATCH_PARENT,
+                                        FrameLayout.LayoutParams.MATCH_PARENT
+                                    )
+                                    visibility = View.INVISIBLE
+                                    setTag(Tag.valueOf("html"))
                                 }
-                            /*head()
-                                .select("style")
-                                .forEach {
-                                    it.data()
-                                }*/
+                                addView(html)
+                                Jsoup.parse(body.string() ?: "").apply {
+                                    //normalise()
+                                    select("link")
+                                        .forEach {
+                                            if (it.attributes().hasKeyIgnoreCase("href")) {
+                                                loadResource(it.attributes().getIgnoreCase("href"), tag)
+                                            }
+                                        }
+                                    select("style")
+                                        .forEach {
+                                            documentStyle += it.data()
+                                        }
+                                    select("script")
+                                        .forEach {
+                                            if (it.attributes().hasKeyIgnoreCase("src")) {
+                                                loadResource(it.attributes().getIgnoreCase("src"), tag)
+                                            } else {
+                                                documentScript += it.data()
+                                            }
+                                        }
+                                }
+                                Timber.d(documentStyle)
+                                Timber.d(documentScript)
+                            }
+                            "css" -> {
+                                Timber.d(body.string())
+                            }
                         }
-                        /*val body = ElementViewGroup(context).apply {
-                            tag = Tag.valueOf("body")
-                        }
-                        addView(body)
-                        body.smth(document.body())*/
                     }
-                    else -> {
-                        Timber.d(body?.contentType()?.type() + "/" + body?.contentType()?.subtype())
+                    "application" -> {
+                        when (body.contentType()?.subtype()) {
+                            "javascript", "x-javascript" -> {
+                                Timber.d(body.string())
+                            }
+                            "octet-stream" -> {
+
+                            }
+                        }
                     }
                 }
             }
-            else -> {
-                Timber.d(body?.contentType()?.type() + "/" + body?.contentType()?.subtype())
-            }
+        }
+    }
+
+    private fun loadResource(url: String, tag: Any?) {
+        val formattedUrl = url.split("?")[0]
+            .trim()
+        if (".(css|js|eot|otf|ttf|woff|woff2)$".toRegex().matches(formattedUrl)) {
+            makeRequest(formattedUrl, tag)
         }
     }
 
