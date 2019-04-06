@@ -15,6 +15,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.parser.Tag
+import timber.log.Timber
 import java.io.IOException
 
 class NativeWebView : FrameLayout, CoroutineScope {
@@ -57,8 +58,7 @@ class NativeWebView : FrameLayout, CoroutineScope {
         var scripts = ""
         launch {
             val body = makeRequest(url, url).await(-1).body()
-            val bodyType = "${body?.contentType()?.type()}/${body?.contentType()?.subtype()}".toLowerCase()
-            when (bodyType) {
+            when ("${body?.contentType()?.type()}/${body?.contentType()?.subtype()}".toLowerCase()) {
                 "text/html" -> {
                     val html = ElementViewGroup(context.applicationContext).apply {
                         id = R.id.page_content
@@ -76,33 +76,23 @@ class NativeWebView : FrameLayout, CoroutineScope {
                 }
             }
             withContext(Dispatchers.IO) {
-                val job = Job(job)
+                val job = SupervisorJob(job)
                 Jsoup.parse(body?.string() ?: "").apply {
                     //normalise()
                     select("style")
                         .forEach {
-                            styles += it.data()
+                            styles += "${it.data()}\n"
                         }
-                    var i = 0
-                    select("link") + select("script")
+                    (select("link") + select("script"))
                         .forEach {
                             when {
-                                it.attributes().hasKeyIgnoreCase("href") or it.attributes().hasKeyIgnoreCase("src") -> {
-                                    val resourceUrl = when {
-                                        it.attributes().hasKeyIgnoreCase("href") -> it.attributes().getIgnoreCase("href")
-                                        else -> it.attributes().getIgnoreCase("src")
-                                    }
-                                    val call = loadResource(resourceUrl, url) ?: return@forEach
-                                    i++
+                                it.attributes().hasKeyIgnoreCase("href") -> {
+                                    val resourceCall =
+                                        loadResource(it.attributes().getIgnoreCase("href"), url) ?: return@forEach
                                     launch(job) {
-                                        val resource = call.await(i).body()
-                                        val resourceType =
-                                            "${resource?.contentType()?.type()}/${resource?.contentType()?.subtype()}".toLowerCase()
-                                        when (resourceType) {
+                                        val resource = resourceCall.await(0).body()
+                                        when ("${resource?.contentType()?.type()}/${resource?.contentType()?.subtype()}".toLowerCase()) {
                                             "text/css" -> {
-
-                                            }
-                                            "application/javascript", "application/x-javascript" -> {
 
                                             }
                                             "application/octet-stream" -> {
@@ -111,15 +101,29 @@ class NativeWebView : FrameLayout, CoroutineScope {
                                         }
                                     }
                                 }
+                                it.attributes().hasKeyIgnoreCase("src") -> {
+                                    val resourceCall =
+                                        loadResource(it.attributes().getIgnoreCase("src"), url) ?: return@forEach
+                                    launch(job) {
+                                        val resource = resourceCall.await(0).body()
+                                        when ("${resource?.contentType()?.type()}/${resource?.contentType()?.subtype()}".toLowerCase()) {
+                                            "application/javascript", "application/x-javascript" -> {
+
+                                            }
+                                        }
+                                    }
+                                }
                                 else -> if (it.tagName() == "script") {
-                                    scripts += it.data()
+                                    scripts += "${it.data()}\n"
                                 }
                             }
                         }
                 }
+                Timber.d(styles)
                 job.children.forEach {
                     it.join()
                 }
+                Timber.d(scripts)
             }
         }
     }
@@ -131,7 +135,7 @@ class NativeWebView : FrameLayout, CoroutineScope {
         if (formattedUrl.startsWith("//")) {
             formattedUrl = "http:$formattedUrl"
         }
-        if (".(css|js|eot|otf|ttf|woff|woff2)$".toRegex().matches(formattedUrl)) {
+        if (".*.(css|js|eot|otf|ttf|woff|woff2)$".toRegex(setOf(RegexOption.IGNORE_CASE)).matches(formattedUrl)) {
             return makeRequest(formattedUrl, tag)
         }
         return null
