@@ -12,13 +12,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
-        webView.setWebViewClient {
-            shouldOverrideUrlLoading {
-                input.setText(it)
-                return@shouldOverrideUrlLoading true
+        webView.apply {
+            setBrowserClient {
+                shouldOverrideUrlLoading {
+                    input.setText(it)
+                    return@shouldOverrideUrlLoading false
+                }
             }
+            loadFromAssets("sample1/index.html")
         }
-        webView.loadUrl("https://yandex.ru")
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -32,7 +34,7 @@ class MainActivity : AppCompatActivity() {
                 webView.reload()
             }
             R.id.action_google -> {
-                webView.loadUrl("https://google.ru")
+                webView.loadFromUrl("https://google.ru")
             }
             else -> {
                 return super.onOptionsItemSelected(item)

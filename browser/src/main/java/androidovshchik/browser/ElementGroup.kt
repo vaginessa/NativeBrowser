@@ -6,7 +6,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import org.jsoup.nodes.Element
 import timber.log.Timber
 
-class ElementViewGroup @JvmOverloads constructor(
+class ElementGroup @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : ConstraintLayout(context, attrs, defStyleAttr) {
 
