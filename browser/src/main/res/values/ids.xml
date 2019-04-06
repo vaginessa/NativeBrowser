@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <item name="page_content" type="id"/>
+    <item name="native_browser_html" type="id"/>
+    <item name="native_browser_body" type="id"/>
 </resources>

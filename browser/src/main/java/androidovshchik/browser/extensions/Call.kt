@@ -6,34 +6,29 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Response
-import timber.log.Timber
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-suspend fun Call.await(i: Int): Response {
-    return suspendCancellableCoroutine { continuation ->
-        Timber.d("enqueue $i")
-        enqueue(object : Callback {
+suspend fun Call.await(): Response = suspendCancellableCoroutine { continuation ->
+    enqueue(object : Callback {
 
-            override fun onResponse(call: Call, response: Response) {
-                Timber.d("onResponse $i")
-                if (!continuation.isCancelled) {
-                    continuation.resume(response)
-                }
+        override fun onResponse(call: Call, response: Response) {
+            if (!continuation.isCancelled) {
+                continuation.resume(response)
             }
+        }
 
-            override fun onFailure(call: Call, e: IOException) {
-                if (!continuation.isCancelled) {
-                    continuation.resumeWithException(e)
-                }
+        override fun onFailure(call: Call, e: IOException) {
+            if (!continuation.isCancelled) {
+                continuation.resumeWithException(e)
             }
-        })
-        continuation.invokeOnCancellation {
-            try {
-                cancel()
-            } catch (e: Throwable) {
-            }
+        }
+    })
+    continuation.invokeOnCancellation {
+        try {
+            cancel()
+        } catch (e: Throwable) {
         }
     }
 }
